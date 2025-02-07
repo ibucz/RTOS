@@ -1,67 +1,106 @@
-Seat Heater Control System
-This project implements a real-time seat heater control system for the front two seats of a car using FreeRTOS and a Tiva C microcontroller. The system controls the seat temperature based on user input, provides diagnostics, and displays system data on a shared screen via UART.
+# Seat Heater Control System
 
-Features
-Temperature Control: Supports three heating levels (Low, Medium, High) and an Off state. The heating intensity adjusts based on the difference between the current and desired temperatures.
-Diagnostics: Detects temperature sensor failures and logs them in memory. A red LED indicates sensor issues.
-User Interface: A shared screen displays the current temperature, heating level, and heater status.
-Event-based Architecture: Button presses trigger corresponding heating events, and tasks manage the heating levels accordingly.
-Real-time Measurements: The system monitors CPU load, task execution time, and resource lock time using FreeRTOS and the GPTM module.
-Hardware Components
-Each seat (driver and passenger) includes:
+This project implements a real-time seat heater control system for the front two seats of a car using **FreeRTOS** and a **Tiva C** microcontroller. The system regulates seat temperature based on user input, provides diagnostics, and displays system data on a shared screen via **UART**.
 
-A temperature sensor (simulated as a potentiometer).
-LEDs to simulate the heater intensity (green for low, blue for medium, cyan for high).
-A button to control the heating level.
+---
+
+## Features
+
+- **Temperature Control:**
+  - Supports three heating levels (**Low, Medium, High**) and an **Off** state.
+  - Adjusts heating intensity based on the difference between current and desired temperatures.
+
+- **Diagnostics:**
+  - Detects temperature sensor failures and logs them in memory.
+  - A **red LED** indicates sensor issues.
+
+- **User Interface:**
+  - A shared screen displays the current temperature, heating level, and heater status.
+
+- **Event-based Architecture:**
+  - Button presses trigger corresponding heating events.
+  - Tasks manage heating levels accordingly.
+
+- **Real-time Measurements:**
+  - Monitors CPU load, task execution time, and resource lock time using **FreeRTOS** and the **GPTM** module.
+
+---
+
+## Hardware Components
+
+Each seat (**driver and passenger**) includes:
+- A **temperature sensor** (simulated as a potentiometer).
+- **LEDs** to simulate heater intensity:
+  - **Green** for low
+  - **Blue** for medium
+  - **Cyan** for high
+- A **button** to control the heating level.
+
 Additional components:
+- **Red LED** for error reporting.
+- **An extra button** on the steering wheel to control the driver's seat heater.
 
-A red LED for error reporting.
-An extra button on the steering wheel to control the driver's seat heater.
-Task Architecture
-The system is designed with the following tasks:
+---
 
-PassengerButtonHandler
+## Task Architecture
 
-Description: Handles the passenger button press and sets corresponding event bits.
-Type: Periodic
-Periodicity: 100ms
-Events Set: PASSENGER_EVENT_BIT_BUTTON_PRESSED_LOW, PASSENGER_EVENT_BIT_BUTTON_PRESSED_MEDIUM, PASSENGER_EVENT_BIT_BUTTON_PRESSED_HIGH
-DriverButtonHandler
+| Task Name                   | Description                                          | Type        | Periodicity | Events Set/Waited |
+|-----------------------------|------------------------------------------------------|-------------|-------------|-------------------|
+| **PassengerButtonHandler**  | Handles passenger button press events.              | Periodic    | 100ms       | `PASSENGER_EVENT_BIT_BUTTON_PRESSED_*` |
+| **DriverButtonHandler**     | Handles driver button press events.                 | Periodic    | 100ms       | `DRIVER_EVENT_BIT_BUTTON_PRESSED_*` |
+| **Temperature_Task**        | Monitors seat temperatures and detects errors.      | Periodic    | 100ms       | None |
+| **Heating_level_LOW**       | Manages heating at low level.                       | Event-based | N/A         | `*_EVENT_BIT_BUTTON_PRESSED_LOW` |
+| **Heating_level_MEDIUM**    | Manages heating at medium level.                    | Event-based | N/A         | `*_EVENT_BIT_BUTTON_PRESSED_MEDIUM` |
+| **Heating_level_HIGH**      | Manages heating at high level.                      | Event-based | N/A         | `*_EVENT_BIT_BUTTON_PRESSED_HIGH` |
+| **vRunTimeMeasurementsTask** | Monitors CPU load and outputs via UART.            | Periodic    | 500ms       | None |
 
-Description: Handles the driver button press and sets corresponding event bits.
-Type: Periodic
-Periodicity: 100ms
-Events Set: DRIVER_EVENT_BIT_BUTTON_PRESSED_LOW, DRIVER_EVENT_BIT_BUTTON_PRESSED_MEDIUM, DRIVER_EVENT_BIT_BUTTON_PRESSED_HIGH
-Temperature_Task
+---
 
-Description: Monitors seat temperatures and checks for out-of-range values.
-Type: Periodic
-Periodicity: 100ms
-Heating_level_LOW
+## Shared Resources
 
-Description: Manages heating at the low level and adjusts LED indicators.
-Type: Event-based
-Events Waited: DRIVER_EVENT_BIT_BUTTON_PRESSED_LOW, PASSENGER_EVENT_BIT_BUTTON_PRESSED_LOW
-Heating_level_MEDIUM
+- **UART:**
+  - Shared by multiple tasks, access protected by a **mutex** to prevent data corruption.
+- **Event Group:**
+  - Used to synchronize button press events and heating level tasks.
+  - Managed using **FreeRTOS APIs**.
+- **Temperature Sensors:**
+  - Read by the `Temperature_Task`.
+  - Other tasks access the latest readings sequentially.
 
-Description: Manages heating at the medium level and adjusts LED indicators.
-Type: Event-based
-Events Waited: DRIVER_EVENT_BIT_BUTTON_PRESSED_MEDIUM, PASSENGER_EVENT_BIT_BUTTON_PRESSED_MEDIUM
-Heating_level_HIGH
+---
 
-Description: Manages heating at the high level and adjusts LED indicators.
-Type: Event-based
-Events Waited: DRIVER_EVENT_BIT_BUTTON_PRESSED_HIGH, PASSENGER_EVENT_BIT_BUTTON_PRESSED_HIGH
-vRunTimeMeasurementsTask
+## Project Structure
 
-Description: Periodically calculates CPU load and outputs it via UART.
-Type: Periodic
-Periodicity: 500ms
-Shared Resources
-UART: Shared by multiple tasks, access protected by a mutex to prevent data corruption.
-Event Group: Used to synchronize button press events and heating level tasks, managed using FreeRTOS APIs.
-Temperature Sensors: Read by the Temperature_Task, with sequential access by other tasks dependent on the latest readings.
-Project Structure
-src/: Contains all source code for the application tasks, FreeRTOS configuration, and MCAL modules (GPIO, UART, GPTM, ADC).
-simso/: Contains the Simso simulation project for deadline analysis.
-docs/: Contains project documentation, including task design, resource sharing, system output screenshots, and runtime measurement results.
+```
+Seat-Heater-Control-System/
+│-- src/        # Application tasks, FreeRTOS config, MCAL modules (GPIO, UART, GPTM, ADC)
+│-- simso/      # Simso simulation project for deadline analysis
+│-- docs/       # Documentation, system output screenshots, runtime measurement results
+│-- README.md   # Project description and usage details
+```
+
+---
+
+## How to Run
+
+1. Clone this repository:
+   ```sh
+   git clone https://github.com/ibucz/Seat-Heater-Control-System.git
+   ```
+2. Open the project in your preferred **IDE** (e.g., **Keil, Code Composer Studio**).
+3. Compile and flash the firmware onto the **Tiva C** microcontroller.
+4. Connect a UART terminal to monitor system output.
+
+---
+
+## License
+
+This project is licensed under the **MIT License**.
+
+---
+
+## Contributors
+- [ahmed abulaziz](https://github.com/ibucz)
+
+Feel free to contribute to this project by submitting issues or pull requests! 🚀
+
